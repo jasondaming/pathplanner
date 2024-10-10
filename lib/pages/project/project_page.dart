@@ -5,24 +5,19 @@ import 'package:file/file.dart';
 import 'package:flutter/material.dart';
 import 'package:multi_split_view/multi_split_view.dart';
 import 'package:path/path.dart';
-import 'package:pathplanner/commands/command.dart';
-import 'package:pathplanner/commands/command_groups.dart';
-import 'package:pathplanner/commands/named_command.dart';
 import 'package:pathplanner/pages/auto_editor_page.dart';
 import 'package:pathplanner/pages/choreo_path_editor_page.dart';
 import 'package:pathplanner/pages/path_editor_page.dart';
+import 'package:pathplanner/pages/project/mangement_dialog_fab.dart';
 import 'package:pathplanner/pages/project/project_item_card.dart';
 import 'package:pathplanner/auto/pathplanner_auto.dart';
 import 'package:pathplanner/path/choreo_path.dart';
-import 'package:pathplanner/path/event_marker.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
 import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/services/pplib_telemetry.dart';
 import 'package:pathplanner/util/prefs.dart';
-import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/widgets/conditional_widget.dart';
-import 'package:pathplanner/widgets/dialogs/management_dialog.dart';
 import 'package:pathplanner/widgets/field_image.dart';
 import 'package:pathplanner/widgets/renamable_title.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -308,129 +303,14 @@ class _ProjectPageState extends State<ProjectPage> {
           alignment: Alignment.bottomRight,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: FloatingActionButton(
-              clipBehavior: Clip.antiAlias,
-              tooltip: 'Manage Events & Linked Waypoints',
-              backgroundColor: colorScheme.surface,
-              foregroundColor: colorScheme.onSurface,
-              onPressed: () => showDialog(
-                context: context,
-                builder: (BuildContext context) => ManagementDialog(
-                  onEventRenamed: (String oldName, String newName) {
-                    setState(() {
-                      for (PathPlannerPath path in _paths) {
-                        for (EventMarker m in path.eventMarkers) {
-                          if (m.command != null) {
-                            _replaceNamedCommand(oldName, newName, m.command!);
-                          }
-                          if (m.name == oldName) {
-                            m.name = newName;
-                          }
-                        }
-                        path.generateAndSavePath();
-                      }
-
-                      for (PathPlannerAuto auto in _autos) {
-                        for (Command cmd in auto.sequence.commands) {
-                          _replaceNamedCommand(oldName, newName, cmd);
-                        }
-                        auto.saveFile();
-                      }
-                    });
-                  },
-                  onEventDeleted: (String name) {
-                    setState(() {
-                      for (PathPlannerPath path in _paths) {
-                        for (EventMarker m in path.eventMarkers) {
-                          if (m.command != null) {
-                            _replaceNamedCommand(name, null, m.command!);
-                          }
-                          if (m.name == name) {
-                            m.name = '';
-                          }
-                        }
-                        path.generateAndSavePath();
-                      }
-
-                      for (PathPlannerAuto auto in _autos) {
-                        for (Command cmd in auto.sequence.commands) {
-                          _replaceNamedCommand(name, null, cmd);
-                        }
-                        auto.saveFile();
-                      }
-                    });
-                  },
-                  onLinkedRenamed: (String oldName, String newName) {
-                    setState(() {
-                      Translation2d? pos = Waypoint.linked.remove(oldName);
-
-                      if (pos != null) {
-                        Waypoint.linked[newName] = pos;
-
-                        for (PathPlannerPath path in _paths) {
-                          bool changed = false;
-
-                          for (Waypoint w in path.waypoints) {
-                            if (w.linkedName == oldName) {
-                              w.linkedName = newName;
-                              changed = true;
-                            }
-                          }
-
-                          if (changed) {
-                            path.generateAndSavePath();
-                          }
-                        }
-                      }
-                    });
-                  },
-                  onLinkedDeleted: (String name) {
-                    setState(() {
-                      Waypoint.linked.remove(name);
-
-                      for (PathPlannerPath path in _paths) {
-                        bool changed = false;
-
-                        for (Waypoint w in path.waypoints) {
-                          if (w.linkedName == name) {
-                            w.linkedName = null;
-                            changed = true;
-                          }
-                        }
-
-                        if (changed) {
-                          path.generateAndSavePath();
-                        }
-                      }
-                    });
-                  },
-                ),
-              ),
-              // Dumb hack to get an elevation surface tint
-              child: Stack(
-                children: [
-                  Container(
-                    color: colorScheme.surfaceTint.withOpacity(0.1),
-                  ),
-                  const Center(child: Icon(Icons.edit_note_rounded)),
-                ],
-              ),
+            child: ManagementDialogFAB(
+              allPaths: _paths,
+              allAutos: _autos,
             ),
           ),
         ),
       ],
     );
-  }
-
-  void _replaceNamedCommand(
-      String originalName, String? newName, Command command) {
-    if (command is NamedCommand && command.name == originalName) {
-      command.name = newName;
-    } else if (command is CommandGroup) {
-      for (Command cmd in command.commands) {
-        _replaceNamedCommand(originalName, newName, cmd);
-      }
-    }
   }
 
   Widget _buildPathsGrid(BuildContext context) {
